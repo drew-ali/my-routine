@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- This viewport tag is the magic fix for mobile sizing -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Weekly habit tracker</title>
+<style>
+  :root {
+    --paper: #EDEAE3;
+    --ink: #2A2E27;
+    --ink-soft: #6B6A5F;
+    --line: #C9C3B8;
+    --stamp: #8C3B2E;
+    --stamp-bg: #F3DFD9;
+    --done: #3F6C4A;
+    --done-bg: #DEEAD9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1C1C1A;
+      --ink: #E9E6DD;
+      --ink-soft: #A6A398;
+      --line: #3A3831;
+      --stamp: #E0968A;
+      --stamp-bg: #3A2622;
+      --done: #9AC8A2;
+      --done-bg: #1F3323;
+    }
+  }
+  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  .mono { font-family: 'Courier New', ui-monospace, monospace; }
+  body { margin: 0; font-size: 16px; background-color: var(--line); padding: 10px; -webkit-text-size-adjust: 100%; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  
+  .sheet { background: var(--paper); color: var(--ink); border-radius: 16px; padding: 1.25rem; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  
+  /* Upgraded Tabs for Touch */
+  .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; background: rgba(107, 106, 95, 0.1); padding: 4px; border-radius: 10px; }
+  .tab-btn { flex: 1; background: transparent; border: none; color: var(--ink-soft); border-radius: 8px; padding: 12px 14px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .tab-btn.active { color: var(--paper); background: var(--ink); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+  
+  .head { display: flex; flex-direction: column; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 1rem; margin-bottom: 1.25rem; }
+  .head h1 { font-size: 22px; font-weight: 600; margin: 0; }
+  
+  /* Larger select area */
+  .week-select { background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink-soft); border-radius: 8px; padding: 12px; font-size: 15px; font-weight: 500; font-family: inherit; width: 100%; appearance: none; }
+  
+  /* Mobile-optimized scrolling table */
+  .grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -1.25rem; padding: 0 1.25rem; scrollbar-width: none; }
+  .grid-scroll::-webkit-scrollbar { display: none; }
+  
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; min-width: 600px; }
+  th, td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 12px 6px; text-align: center; }
+  th { border-top: 1px solid var(--line); font-weight: 600; color: var(--ink-soft); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  /* Sticky column with clean shadowing */
+  .habit-col { text-align: left; width: 180px; font-size: 14px; font-weight: 500; padding-left: 12px; position: sticky; left: -1.25rem; background: var(--paper); border-left: 1px solid var(--line); z-index: 10; box-shadow: 2px 0 4px rgba(0,0,0,0.03); }
+  th.habit-col { z-index: 11; }
+  
+  .mono-only { font-size: 13px; color: var(--ink-soft); }
+  
+  /* Larger checkboxes for touch */
+  .chk { width: 28px; height: 28px; cursor: pointer; accent-color: var(--done); margin: 0; }
+  
+  .section-label { font-size: 14px; font-weight: 600; color: var(--ink-soft); margin: 2rem 0 1rem; text-transform: uppercase; letter-spacing: 1px; }
+  
+  /* Responsive grid for Evening Rotation */
+  .rotation { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width: 600px) {
+    .rotation { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .head { flex-direction: row; justify-content: space-between; align-items: center; }
+    .week-select { width: auto; }
+  }
+  
+  .rot-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: rgba(0,0,0,0.03); }
+  .rot-day { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; }
+  .rot-input { width: 100%; border: none; background: transparent; color: var(--ink); font-size: 15px; font-family: inherit; resize: vertical; line-height: 1.5; }
+  .rot-input:focus { outline: none; border-bottom: 2px solid var(--stamp); }
+  
+  .notes-cell { vertical-align: top; padding: 6px; }
+  .notes-input { width: 100%; min-height: 80px; font-size: 14px; font-family: inherit; border: none; background: transparent; color: var(--ink); resize: vertical; line-height: 1.4; }
+  .notes-input:focus { outline: none; background: rgba(0,0,0,0.03); border-radius: 6px; }
+  
+  .footer-row { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; font-size: 14px; color: var(--ink-soft); font-weight: 500; }
+  .streak { color: var(--done); font-weight: 700; font-size: 16px; }
+  
+  .page { display: none; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .rtable { width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 2rem; min-width: 100%; }
+  .rtable th, .rtable td { border: none; border-bottom: 1px solid var(--line); padding: 12px 0; text-align: left; vertical-align: top; }
+  .rtable th { color: var(--ink-soft); font-weight: 600; width: 110px; padding-right: 12px; }
+  .rday-label { font-size: 18px; font-weight: 600; margin: 2.5rem 0 0.5rem; border-bottom: 2px solid var(--stamp); display: inline-block; padding-bottom: 4px; }
+  .rnote { font-size: 14px; color: var(--ink-soft); margin: 0.5rem 0 2rem; font-style: italic; line-height: 1.5; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px; border-left: 3px solid var(--stamp); }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-tracker">Tracker</button>
+    <button class="tab-btn" id="tab-routine">Routine</button>
+  </div>
+
+  <div class="page active" id="page-tracker">
+  <div class="head">
+    <div>
+      <h1>Weekly Log</h1>
+    </div>
+    <select class="week-select" id="week-select"></select>
+  </div>
+
+  <div class="grid-scroll">
+  <table id="grid">
+    <thead>
+      <tr>
+        <th class="habit-col">Habit</th>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  </div>
+
+  <div class="footer-row">
+    <span id="week-score"></span>
+    <span id="save-state"></span>
+  </div>
+
+  <div class="section-label">Evening rotation</div>
+  <div class="rotation" id="rotation"></div>
+  </div>
+
+  <div class="page" id="page-routine">
+    <p class="rday-label">Tue, Wed, Thu</p>
+    <table class="rtable">
+      <tr><th>5:00 AM</th><td>Wake, water, no phone yet</td></tr>
+      <tr><th>5:05–5:35</th><td>Workout</td></tr>
+      <tr><th>5:35–5:55</th><td>Shower, get ready</td></tr>
+      <tr><th>5:55–6:00</th><td>Glance at day's plan</td></tr>
+      <tr><th>6:00–12:00</th><td>Work (USCIS, WFH)</td></tr>
+      <tr><th>12:00–1:00</th><td>Lunch away from desk, short walk, text family/friend</td></tr>
+      <tr><th>1:00–5:00</th><td>Work</td></tr>
+      <tr><th>5:00–5:30</th><td>Decompress / transition</td></tr>
+      <tr><th>5:30–6:15</th><td>Dinner + family time</td></tr>
+      <tr><th>6:15–8:00</th><td>Hobby block</td></tr>
+      <tr><th>8:00–8:45</th><td>Reading</td></tr>
+      <tr><th>8:45–9:15</th><td>Journal + tomorrow's plan/budget</td></tr>
+      <tr><th>9:15–9:30</th><td>Wind down, no screens</td></tr>
+      <tr><th>9:30 PM</th><td>Sleep</td></tr>
+    </table>
+
+    <p class="rday-label">Friday</p>
+    <table class="rtable">
+      <tr><th>5:00 AM</th><td>Wake</td></tr>
+      <tr><th>5:05–5:35</th><td>Workout (lightest of the week)</td></tr>
+      <tr><th>5:35–6:00</th><td>Shower, get ready</td></tr>
+      <tr><th>6:00–12:00</th><td>Work (USCIS)</td></tr>
+      <tr><th>12:00–1:00</th><td>Lunch</td></tr>
+      <tr><th>1:00–5:00</th><td>Work</td></tr>
+      <tr><th>5:00–5:30</th><td>Dinner — quick, protein-forward</td></tr>
+      <tr><th>5:30–5:45</th><td>Commute to GameStop</td></tr>
+      <tr><th>6:00–9:30</th><td>GameStop shift</td></tr>
+      <tr><th>9:30–9:45</th><td>Commute home</td></tr>
+      <tr><th>9:45–10:15</th><td>Quick journal, no screens</td></tr>
+      <tr><th>10:15–10:30</th><td>Sleep</td></tr>
+    </table>
+    <p class="rnote">Longest day, door to door. Nothing demanding after 9:45pm.</p>
+
+    <p class="rday-label">Monday (Reset Day)</p>
+    <table class="rtable">
+      <tr><th>6:00–6:30</th><td>Wake — later than weekday</td></tr>
+      <tr><th>Morning</th><td>Longer workout</td></tr>
+      <tr><th>Mid-morn</th><td>Cleaning / household reset</td></tr>
+      <tr><th>Midday</th><td>Grocery run + meal prep</td></tr>
+      <tr><th>Early aft</th><td>Budgeting / finances review</td></tr>
+      <tr><th>Afternoon</th><td>Weekly goal check-in</td></tr>
+      <tr><th>Evening</th><td>Light — family, friend, or hobby time</td></tr>
+      <tr><th>Bedtime</th><td>Journal + write out Tuesday's plan</td></tr>
+    </table>
+
+    <p class="rday-label">Saturday / Sunday</p>
+    <p class="rnote">Not fully scripted — flex days for deeper friend/family time and hobbies. Wake within about an hour of your weekday time to protect Monday's early start. Pick one day for batch food prep if Monday feels too packed.</p>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const HABITS = [
+  { id: 'wake', label: 'Wake time hit', days: [0,1,2,3,4,5,6] },
+  { id: 'workout', label: 'Workout done', days: [0,1,2,3,4,5,6] },
+  { id: 'lunch', label: 'Lunch away from desk', days: [1,2,3,4] },
+  { id: 'reading', label: 'Reading', days: [0,1,2,3,4,5,6] },
+  { id: 'journal', label: 'Journal', days: [0,1,2,3,4,5,6] },
+  { id: 'cutoff', label: 'Digital cutoff before bed', days: [0,1,2,3,4,5,6] },
+  { id: 'errand', label: 'Errand / appt / call', days: [0,1,2,3,4,5,6] },
+  { id: 'mealprep', label: 'Meal prep', days: [0] },
+  { id: 'budget', label: 'Budget review', days: [0] },
+  { id: 'cleaning', label: 'Cleaning', days: [0] },
+];
+const ROTATION_DEFAULTS = {
+  Mon: 'Flex — hobby or family',
+  Tue: 'Hobby night',
+  Wed: 'Friends — call or hang out',
+  Thu: 'Family or hobby (swap weekly)',
+  Fri: 'GameStop shift',
+  Sat: 'Friends, in person',
+  Sun: 'Family time',
+};
+
+function getWeekKey(d) {
+  const monday = new Date(d);
+  const day = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - day);
+  return monday.toISOString().slice(0, 10);
+}
+function formatRange(weekKey) {
+  const start = new Date(weekKey + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const opts = { month: 'short', day: 'numeric' };
+  return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`;
+}
+
+let weekKey = getWeekKey(new Date());
+let state = {};
+let rotation = { ...ROTATION_DEFAULTS };
+
+function populateWeekSelect() {
+  const sel = document.getElementById('week-select');
+  sel.innerHTML = '';
+  const todayKey = getWeekKey(new Date());
+  const base = new Date(todayKey + 'T00:00:00');
+  for (let i = -8; i <= 16; i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i * 7);
+    const key = getWeekKey(d);
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = formatRange(key) + (key === todayKey ? ' (this week)' : '');
+    sel.appendChild(opt);
+  }
+  sel.value = weekKey;
+}
+
+function buildGrid() {
+  const tbody = document.querySelector('#grid tbody');
+  tbody.innerHTML = '';
+  HABITS.forEach(h => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.className = 'habit-col';
+    nameTd.textContent = h.label;
+    tr.appendChild(nameTd);
+    DAYS.forEach((d, i) => {
+      const td = document.createElement('td');
+      if (h.days.includes(i)) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'chk';
+        cb.checked = !!(state[h.id] && state[h.id][i]);
+        cb.addEventListener('change', () => {
+          state[h.id] = state[h.id] || {};
+          state[h.id][i] = cb.checked;
+          saveState();
+          updateScore();
+        });
+        td.appendChild(cb);
+      } else {
+        td.innerHTML = '<span class="mono-only">—</span>';
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  const notesTr = document.createElement('tr');
+  const notesLabelTd = document.createElement('td');
+  notesLabelTd.className = 'habit-col';
+  notesLabelTd.textContent = 'Notes / Goals';
+  notesTr.appendChild(notesLabelTd);
+  DAYS.forEach((d, i) => {
+    const td = document.createElement('td');
+    td.className = 'notes-cell';
+    const ta = document.createElement('textarea');
+    ta.className = 'notes-input';
+    ta.rows = 4;
+    ta.value = (state.notes && state.notes[i]) || '';
+    ta.addEventListener('input', () => {
+      state.notes = state.notes || {};
+      state.notes[i] = ta.value;
+      saveState();
+    });
+    td.appendChild(ta);
+    notesTr.appendChild(td);
+  });
+  tbody.appendChild(notesTr);
+
+  updateScore();
+}
+
+function updateScore() {
+  let total = 0, done = 0;
+  HABITS.forEach(h => {
+    h.days.forEach(i => {
+      total++;
+      if (state[h.id] && state[h.id][i]) done++;
+    });
+  });
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('week-score').innerHTML = `<span class="streak">${done}/${total}</span> checked (${pct}%)`;
+}
+
+function buildRotation() {
+  const wrap = document.getElementById('rotation');
+  wrap.innerHTML = '';
+  DAYS.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'rot-card';
+    const label = document.createElement('div');
+    label.className = 'rot-day';
+    label.textContent = d;
+    const input = document.createElement('textarea');
+    input.className = 'rot-input';
+    input.rows = 2;
+    input.value = rotation[d] || '';
+    input.addEventListener('input', () => {
+      rotation[d] = input.value;
+      saveRotation();
+    });
+    card.appendChild(label);
+    card.appendChild(input);
+    wrap.appendChild(card);
+  });
+}
+
+// Replaced window.storage with standard localStorage
+function saveState() {
+  const el = document.getElementById('save-state');
+  try {
+    localStorage.setItem('habit-week:' + weekKey, JSON.stringify(state));
+    el.textContent = 'Saved';
+    setTimeout(() => { el.textContent = ''; }, 1200);
+  } catch (e) {
+    el.textContent = "Couldn't save";
+  }
+}
+
+function saveRotation() {
+  try {
+    localStorage.setItem('rotation', JSON.stringify(rotation));
+  } catch (e) {}
+}
+
+function loadWeek() {
+  document.getElementById('week-select').value = weekKey;
+  try {
+    const res = localStorage.getItem('habit-week:' + weekKey);
+    state = res ? JSON.parse(res) : {};
+  } catch (e) {
+    state = {};
+  }
+  buildGrid();
+}
+
+function loadRotation() {
+  try {
+    const res = localStorage.getItem('rotation');
+    rotation = res ? JSON.parse(res) : { ...ROTATION_DEFAULTS };
+  } catch (e) {
+    rotation = { ...ROTATION_DEFAULTS };
+  }
+  buildRotation();
+}
+
+document.getElementById('week-select').addEventListener('change', (e) => {
+  weekKey = e.target.value;
+  loadWeek();
+});
+
+document.getElementById('tab-tracker').addEventListener('click', () => switchTab('tracker'));
+document.getElementById('tab-routine').addEventListener('click', () => switchTab('routine'));
+function switchTab(name) {
+  document.getElementById('tab-tracker').classList.toggle('active', name === 'tracker');
+  document.getElementById('tab-routine').classList.toggle('active', name === 'routine');
+  document.getElementById('page-tracker').classList.toggle('active', name === 'tracker');
+  document.getElementById('page-routine').classList.toggle('active', name === 'routine');
+}
+
+populateWeekSelect();
+loadWeek();
+loadRotation();
+</script>
+</body>
+</html>
